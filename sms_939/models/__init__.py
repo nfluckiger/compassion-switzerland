@@ -11,3 +11,8 @@
 
 from . import sms_hook
 from . import sms_notification
+<<<<<<< Updated upstream
+from . import compassion_child
+=======
+from . import sms_sender
+>>>>>>> Stashed changes
