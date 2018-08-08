@@ -12,6 +12,7 @@ from odoo import models, fields, api, tools
 from odoo.tools.config import config
 import httplib
 import base64
+import urllib
 
 
 class SmsSender(models.TransientModel):
@@ -39,18 +40,24 @@ class SmsSender(models.TransientModel):
         password = config.get('939_password')
 
         request_server = httplib.HTTPConnection(
-            'http://blue.smsbox.ch', 10020, timeout=10)
+            'blue.smsbox.ch', 10020, timeout=10)
 
         auth = base64.encodestring('%s:%s' % (username,
                                               password)).replace('\n', '')
 
-        headers['Authorization'] = auth
+        headers['Authorization'] = 'Basic ' + auth
         for sms in self:
-            request = "?receiver=%s&text=%s" % (sms.partner_id.mobile,
-                                                sms.text)
-            request_server.request('GET', '/Blue/sms/rest/websend', request,
-                                   headers)
-            print(request_server.getresponse())
+            request = [
+                ('receiver', self.partner_id.mobile.replace(u'\xa0', u'')),
+                ('service', 'compassion'),
+                ('cost', 0),
+                ('text', self.text)
+            ]
+            print(urllib.urlencode(request))
+            request_server.request('GET', '/Blue/sms/rest/user/websend?'
+                                   + urllib.urlencode(request), headers=headers)
+            reponse = request_server.getresponse()
+            print(reponse.read())
             sms.partner_id.message_post(body=sms.text,
                                         subject='Spontaneous SMS',
                                         partner_ids=sms.partner_id,

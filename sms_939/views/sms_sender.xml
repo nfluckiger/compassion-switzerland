@@ -26,20 +26,19 @@
         <field name="target">new</field>
     </record>
 
-
     <record id="res_partner_sms_update" model="ir.ui.view">
         <field name="name">res_partner_sms_update</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
                 <data>
-                    <div name="button_box" position="after">
+                    <field name="message_ids" position="before">
                         <button type="action" class="btn-link"
                                 attrs="{'invisible': [('mobile', '=', False)]}"
                                 icon="fa-fax" string="Send an SMS"
                                 name="%(sms_sender_open_action)d" context="{'partner_id': id}">
                         </button>
-                    </div>
+                    </field>
                 </data>
         </field>
     </record>
