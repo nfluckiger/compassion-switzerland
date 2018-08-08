@@ -374,6 +374,20 @@
             </field>
         </record>
 
+        <!--
+        Birthday Remainder 1 day before
+        -->
+        <record id="email_sponsorship_birthday_1day_reminder" model="mail.template">
+            <field name="name">Sponsorship - 1 Day Birthday Reminder</field>
+            <field name="model_id" ref="partner_communication.model_partner_communication_job"/>
+            <field name="email_from">compassion@compassion.ch</field>
+            <field name="reply_to">info@compassion.ch</field>
+            <field name="partner_to">${object.partner_id and object.partner_id.email and object.partner_id.id or False }</field>
+            <field name="subject">Wish ${object.get_objects().get('your sponsored child')} a Happy Birthday !</field>
+            <field name="body_html" type="html">
+                <p>To define</p>
+            </field>
+        </record>
 
         <!--
         Completion in 4 months
@@ -717,6 +731,52 @@
                     <br/>
                     <br/>
                     Kind regards,
+                </p>
+            </field>
+        </record>
+
+        <record id="sms_confirmation_email_1" model="mail.template">
+            <field name="name">SMS Sponsorship step1 confirmation</field>
+            <field name="model_id" ref="partner_communication.model_partner_communication_job"/>
+            <field name="email_from">compassion@compassion.ch</field>
+            <field name="reply_to">info@compassion.ch</field>
+            <field name="partner_to">${object.partner_id and object.partner_id.email and object.partner_id.id or False }</field>
+            <field name="subject">Thank you for your sponsorship!</field>
+            <field name="body_html" type="html">
+                <div>
+                    % set sponsorship = object.get_objects()
+                    % set request = sponsorship.env['sms.child.request'].search([('sponsorship_id', '=', sponsorship.id)])
+                    % set child = sponsorship.child_id
+                </div>
+                <p>
+                    You chose to invest in the life of ${child.preferred_name}. There are two more steps before ${child.get('he')} will be informed that you sponsor ${child.get('him')}, but you don't have to hurry. We have reserved the child so that you can take your time to complete the registration.
+                    <br/><br/>
+                    1. You can <a href="${request.full_url}">click here</a> to complete your information and your payment option in the coming days.
+                    <br/>
+                    2. Your sponsorship will be activated when we receive your first payment.
+                    <br/><br/>
+                    Best regards
+                </p>
+            </field>
+        </record>
+        <record id="sms_confirmation_email_2" model="mail.template">
+            <field name="name">SMS Sponsorship step2 confirmation</field>
+            <field name="model_id" ref="partner_communication.model_partner_communication_job"/>
+            <field name="email_from">compassion@compassion.ch</field>
+            <field name="reply_to">info@compassion.ch</field>
+            <field name="partner_to">${object.partner_id and object.partner_id.email and object.partner_id.id or False }</field>
+            <field name="subject">Your sponsorship is confirmed!</field>
+            <field name="body_html" type="html">
+                <div>
+                    % set sponsorship = object.get_objects()
+                    % set child = sponsorship.child_id
+                </div>
+                <p>
+                    Thank you for your commitment towards ${child.preferred_name}. Now that all information is completed, we will activate your sponsorship as soon as we receive your first payment.
+                    <br/><br/>
+                    You will receive more documentation by post in the coming days. In the mean time, feel free to reach us if you have any question.
+                    <br/><br/>
+                    Best regards
                 </p>
             </field>
         </record>

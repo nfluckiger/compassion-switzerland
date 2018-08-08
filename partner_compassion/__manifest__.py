@@ -44,9 +44,11 @@
         'geoengine_partner',
         'base_geolocalize',
         'web_notify',
+        'partner_survey',
+        'website_partner',
     ],
     'external_dependencies': {
-        'python': ['pandas']
+        'python': ['pandas', 'pyminizip']
     },
     'data': [
         'security/ir.model.access.csv',

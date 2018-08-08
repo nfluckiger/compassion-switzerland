@@ -48,6 +48,7 @@ class AmbassadorDetails(models.Model):
         related='partner_id.birthdate_date', store=True, readonly=True)
     lang = fields.Selection(
         related='partner_id.lang', store=True, readonly=True)
+    number_surveys = fields.Integer(related='partner_id.survey_input_count')
 
     # Advocacy fields
     #################
@@ -67,11 +68,13 @@ class AmbassadorDetails(models.Model):
     has_car = fields.Selection('_yes_no_selection', 'Has a car')
     formation_ids = fields.Many2many(
         'calendar.event', string='Formation taken',
-        compute='_compute_formation', inverse='_inverse_formation'
+        compute='_compute_formation', inverse='_inverse_formation',
+        groups="base.group_user"
     )
     engagement_ids = fields.Many2many(
         'ambassador.engagement', 'ambassador_engagement_rel',
-        'ambassador_details_id', 'engagement_id', 'Engagement type'
+        'ambassador_details_id', 'engagement_id', 'Engagement type',
+        groups="base.group_user"
     )
     t_shirt_size = fields.Selection([
         ('XS', 'XS'), ('S', 'S'), ('M', 'M'), ('L', 'L'), ('XL', 'XL'),
@@ -153,6 +156,18 @@ class AmbassadorDetails(models.Model):
             'domain': [('id', 'in', self.event_ids.ids)],
         }
 
+    @api.multi
+    def open_surveys(self):
+        return {
+            'name': _('Surveys'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'tree,form',
+            'res_model': 'survey.user_input',
+            'target': 'current',
+            'domain': [('partner_id', '=', self.partner_id.id)],
+        }
+
     def set_on_break(self):
         self.env.user.notify_info(
             _("Please don't forget to put a break end date"), sticky=True)
@@ -186,8 +201,8 @@ class AmbassadorDetails(models.Model):
             advocate.message_post(
                 body=_(u"This is a reminder that {} will have birthday on {}.")
                 .format(advocate.partner_id.preferred_name,
-                        advocate.partner_id.get_date('birthdate', 'date_month')
-                        ),
+                        advocate.partner_id.get_date(
+                            'birthdate_date', 'date_month')),
                 subject=_(u"[{}] Advocate birthday reminder").format(
                     advocate.display_name),
                 partner_ids=[notify_partner_id],
