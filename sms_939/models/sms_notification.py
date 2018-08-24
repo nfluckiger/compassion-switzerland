@@ -32,7 +32,7 @@ class SmsNotification(models.Model):
     operator = fields.Char()
     service = fields.Char(required=True)
     hook_id = fields.Many2one('sms.hook', 'Hook')
-    language = fields.Char()
+    language = fields.Char(required=True)
     date = fields.Datetime()
     uuid = fields.Char()
     text = fields.Char()
@@ -50,9 +50,8 @@ class SmsNotification(models.Model):
         # Try to find a matching partner given phone number
         phone = vals.get('sender')
         partner_obj = self.env['res.partner']
-        partner = partner_obj.search([
-            ('mobile', 'like', phone)
-        ])
+        partner = partner_obj.search([('mobile', 'like', phone)]) or \
+            partner_obj.search([('phone', 'like', phone)])
         if not partner:
             partner = partner_obj.search([
                 ('phone', 'like', phone)
@@ -63,14 +62,18 @@ class SmsNotification(models.Model):
         hook = self.env['sms.hook'].search([
             ('name', '=ilike', vals['service'])])
         vals['hook_id'] = hook.id
-        sms = super(SmsNotification, self).create(vals)
         if not testing:
             # Directly commit as we don't want to lose SMS in case of failure
             self.env.cr.commit()    # pylint: disable=invalid-commit
         # Return record with language context
-        lang = self.env['res.lang'].search([('code', '=', sms.language)],
-                                           limit=1)
-        sms = sms.with_context(lang=lang and lang.code or 'en_US')
+        langs = self.env['res.lang'] \
+            .search([('code', '=ilike', vals['language'] + '%')], limit=1) \
+            if 'language' in vals and vals['language'] else ()
+        lang_or_en = next((lang.code for lang in langs), 'en_US')
+        vals['language'] = lang_or_en
+
+        sms = super(SmsNotification, self).create(vals)
+        sms = sms.with_context(lang=lang_or_en)
         return sms
 
     def run_service(self):
@@ -106,7 +109,7 @@ class SmsNotification(models.Model):
             # Abort pending operations
             self.env.cr.rollback()
             self.env.invalidate_all()
-            logger.error("Error processing SMS service", exc_info=True)
+            logger.warning("Error processing SMS service", exc_info=True)
             sms_answer = SmsNotificationAnswer(_(
                 "Sorry, the service is not available at this time. "
                 "Our team is informed and is currently working on it."
@@ -133,6 +136,7 @@ class SmsNotification(models.Model):
         # Create a sms child request
         child_request = self.env['sms.child.request'].create({
             'sender': self.sender,
+            'lang_code': self.language
         })
         return SmsNotificationAnswer(
             _("Thank you for your will to help a child ! \n"
@@ -144,3 +148,6 @@ class SmsNotification(models.Model):
     def test_service(self):
         self.ensure_one()
         return SmsNotificationAnswer("Thanks!", costs=0)
+
+    def test_service_error(self):
+        raise Exception
