@@ -17,3 +17,4 @@ from . import account_banking_mandate
 from . import contract_group
 from . import gift_compassion
 from . import queue_job
+from . import contract_origin

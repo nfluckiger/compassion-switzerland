@@ -10,7 +10,6 @@
 #
 ##############################################################################
 from odoo import models, fields, api
-from odoo.addons.website.models.website import slug
 
 
 class EventCompassion(models.Model):
@@ -18,26 +17,22 @@ class EventCompassion(models.Model):
     _inherit = ['crm.event.compassion', 'website.published.mixin',
                 'translatable.model', 'website.seo.metadata']
 
-    name = fields.Char(translate=True)
-    thank_you_text = fields.Html(translate=True)
     muskathlon_event_id = fields.Char(
         string="Muskathlon event ID", size=128)
-    muskathlon_registration_ids = fields.One2many(
-        'muskathlon.registration', 'event_id', 'Muskathlon registrations')
+    registration_ids = fields.One2many(
+        'event.registration', 'compassion_event_id', 'Event registrations')
 
-    website_description = fields.Html(
-        translate=True, sanitize=False)
-    picture_1 = fields.Binary('Banner image', attachment=True)
-    filename_1 = fields.Char(compute='_compute_filenames')
-    participants_amount_objective = fields.Integer(
-        'Default raise objective by participant', default=10000, required=True)
-    registration_fee = fields.Float()
     amount_objective = fields.Integer(compute='_compute_amount_raised')
     amount_raised = fields.Integer(compute='_compute_amount_raised')
     amount_raised_percents = fields.Integer(compute='_compute_amount_raised')
     sport_discipline_ids = fields.Many2many(
         'sport.discipline', string='Sport disciplines')
 
+    website_muskathlon = fields.Boolean(
+        'Activate Muskathlon template',
+        help='This will activate the 4M red template for the event on the'
+             'website and will also use the Muskathlon processes for the'
+             'registrations.')
     # HTML fields for material order page
     website_my_introduction = fields.Html(
         string='Video introduction', translate=True, sanitize=False)
@@ -49,19 +44,6 @@ class EventCompassion(models.Model):
         string='Press material', translate=True, sanitize=False)
     website_my_sport_material = fields.Html(
         string='Sport material', translate=True, sanitize=False)
-    website_side_info = fields.Html(
-        string='Side info', translate=True, sanitize=False
-    )
-
-    @api.multi
-    def _compute_website_url(self):
-        for event in self:
-            event.website_url = "/event/{}".format(slug(event))
-
-    @api.multi
-    def _compute_filenames(self):
-        for event in self:
-            event.filename_1 = event.name + '-1.jpg'
 
     @api.multi
     def _compute_amount_raised(self):
@@ -69,7 +51,7 @@ class EventCompassion(models.Model):
             amount_raised = 0
             amount_objective = 0
 
-            for registration in event.muskathlon_registration_ids:
+            for registration in event.registration_ids:
                 amount_raised += registration.amount_raised
                 amount_objective += registration.amount_objective
 
@@ -79,8 +61,8 @@ class EventCompassion(models.Model):
                 amount_raised * 100 / (amount_objective or 1))
 
     @api.model
-    def get_event_participants(self, event_id):
-        participants = self.env['muskathlon.registration'].search(
+    def get_muskathlon_participants(self, event_id):
+        participants = self.env['event.registration'].search(
             [('event_id', '=', event_id)]
         )
 

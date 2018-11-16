@@ -48,15 +48,14 @@ class SmsNotification(models.Model):
         # Try to find a matching partner given phone number
         phone = vals.get('sender')
         partner_obj = self.env['res.partner']
-        partner = partner_obj.search([('mobile', 'like', phone)]) or \
-            partner_obj.search([('phone', 'like', phone)])
-        if not partner:
-            partner = partner_obj.search([
-                ('phone', 'like', phone)
-            ])
+        partner = partner_obj.search(
+            ['|', ('mobile', 'like', phone),
+             ('phone', 'like', phone),
+             ('active', 'in', [True, False])])
         if partner and len(partner) == 1:
             vals['partner_id'] = partner.id
             vals['language'] = partner.lang
+            partner.active = True
         # Attach the hook configuration
         hook = self.env['sms.hook'].search([
             ('name', '=ilike', vals['service'])])
@@ -123,7 +122,8 @@ class SmsNotification(models.Model):
                     })
         if 'test' not in sms_text:
             self.env['sms.sender.wizard'].create({
-                'text': sms_answer
+                'text': sms_answer,
+                'sms_provider_id': self.env.ref('sms_939.small_account_id').id
             }).send_sms(mobile=sms_receipient)
         else:
             # Test mode will only print url in job return value

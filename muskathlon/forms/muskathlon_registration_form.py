@@ -19,16 +19,16 @@ if not testing:
     # prevent these forms to be registered when running tests
 
     class MuskathlonRegistrationForm(models.AbstractModel):
-        _name = 'cms.form.muskathlon.registration'
-        _inherit = ['cms.form.payment', 'cms.form.match.partner']
+        _name = 'cms.form.event.registration.muskathlon'
+        _inherit = ['cms.form.payment', 'cms.form.event.match.partner']
 
         # The form is inside a Muskathlon details page
         form_buttons_template = 'cms_form_compassion.modal_form_buttons'
         form_id = 'modal_muskathlon_registration'
-        _form_model = 'muskathlon.registration'
+        _form_model = 'event.registration'
         _form_required_fields = [
             'ambassador_picture_1', 'ambassador_quote', 'sport_level',
-            'sport_level_description', 'gtc_accept'
+            'sport_level_description', 'gtc_accept', 't_shirt_size'
         ]
         _payment_accept_redirect = '/muskathlon_registration/payment/validate'
 
@@ -40,6 +40,10 @@ if not testing:
                  "and will be used in thank you letters your donors will "
                  "receive."
         )
+        t_shirt_size = fields.Selection([
+            ('XS', 'XS'), ('S', 'S'), ('M', 'M'), ('L', 'L'), ('XL', 'XL'),
+            ('XXL', 'XXL')
+        ])
         gtc_accept = fields.Boolean(
             "Terms and conditions", required=True
         )
@@ -58,7 +62,7 @@ if not testing:
                     'fields': [
                         'ambassador_picture_1', 'sport_discipline_id',
                         'sport_level', 'sport_level_description',
-                        'ambassador_quote', 'event_id'
+                        'ambassador_quote', 't_shirt_size', 'event_id'
                     ]
                 },
                 {
@@ -66,13 +70,13 @@ if not testing:
                     'title': _('Your coordinates'),
                     'description': '',
                     'fields': [
-                        'partner_title',
-                        'partner_name', 'partner_email', 'partner_phone',
+                        'partner_title', 'partner_firstname',
+                        'partner_lastname', 'partner_email', 'partner_phone',
                         'partner_street', 'partner_zip', 'partner_city',
                         'partner_country_id']
                 }
             ]
-            if self.event_id.registration_fee:
+            if self.event_id.total_price:
                 fieldset.append({
                     'id': 'payment',
                     'title': _('Registration payment'),
@@ -80,7 +84,7 @@ if not testing:
                         'For validating registrations, we ask a fee of '
                         'CHF %s that you can directly pay with your '
                         'Postfinance or Credit Card'
-                    ) % str(self.event_id.registration_fee),
+                    ) % str(self.event_id.total_price),
                     'fields': [
                         'amount', 'currency_id', 'acquirer_ids',
                         'gtc_accept'
@@ -108,7 +112,7 @@ if not testing:
 
         @property
         def _default_amount(self):
-            return self.event_id.registration_fee
+            return self.event_id.total_price
 
         @property
         def form_title(self):
@@ -119,7 +123,7 @@ if not testing:
 
         @property
         def submit_text(self):
-            if self.event_id.registration_fee:
+            if self.event_id.total_price:
                 return _("Proceed with payment")
             else:
                 return _("Register now")
@@ -138,7 +142,7 @@ if not testing:
             form = super(MuskathlonRegistrationForm, self).form_init(
                 request, main_object, **kw)
             # Set default values
-            form.event_id = kw.get('event')
+            form.event_id = kw.get('event').sudo().odoo_event_id
             return form
 
         def form_get_request_values(self):
@@ -165,13 +169,14 @@ if not testing:
 
         def _form_load_sport_level_description(
                 self, fname, field, value, **req_values):
-            # Default value for muskathlon.registration field
+            # Default value for event.registration field
             return req_values.get('sport_level_description', '')
 
         def _form_load_event_id(
                 self, fname, field, value, **req_values):
-            # Default value for muskathlon.registration field
-            return int(req_values.get('event_id', self.event_id.id))
+            # Default value for event.registration field
+            return int(req_values.get('event_id',
+                                      self.event_id.id))
 
         def _form_validate_sport_level_description(self, value, **req_values):
             if not re.match(r"^[\w\s'-]+$", value, re.UNICODE):
@@ -200,19 +205,23 @@ if not testing:
             super(MuskathlonRegistrationForm,
                   self).form_before_create_or_update(values, extra_values)
             uid = self.env.ref('muskathlon.user_muskathlon_portal').id
-            partner = self.partner_id.sudo(uid)
-            if self.event_id.registration_fee:
+            partner = self.env['res.partner'].sudo().browse(
+                values.get('partner_id')).exists()
+            invoice_obj = self.env['account.invoice'].sudo(uid)
+            invoice = invoice_obj
+            event = self.event_id.sudo()
+            if event.total_price:
                 fee_template = self.env.ref('muskathlon.product_registration')
                 product = fee_template.sudo(uid).product_variant_ids[:1]
-                invoice_obj = self.env['account.invoice'].sudo(uid)
-                self.invoice_id = invoice_obj.create({
+                invoice = invoice_obj.create({
                     'partner_id': partner.id,
-                    'currency_id': self.currency_id.id,
+                    'currency_id': extra_values.get('currency_id'),
                     'origin': 'Muskathlon registration',
                     'invoice_line_ids': [(0, 0, {
                         'quantity': 1.0,
-                        'price_unit': self.event_id.registration_fee,
-                        'account_analytic_id': self.event_id.analytic_id.id,
+                        'price_unit': event.total_price,
+                        'account_analytic_id':
+                        event.compassion_event_id.analytic_id.id,
                         'account_id': product.property_account_income_id.id,
                         'name': 'Muskathlon registration fees',
                         'product_id': product.id
@@ -221,46 +230,59 @@ if not testing:
             sporty = self.env.ref('partner_compassion.engagement_sport')
             if partner.advocate_details_id:
                 partner.advocate_details_id.write({
-                    'engagement_ids': [(4, sporty.id)]
+                    'engagement_ids': [(4, sporty.id)],
+                    't_shirt_size': extra_values.get('t_shirt_size')
                 })
             else:
                 # Creation of ambassador details reloads cache and remove
                 # all field values in the form.
                 # This hacks restores the form state after the creation.
-                backup = self._backup_fields()
+                # backup = self._backup_fields()
                 self.env['advocate.details'].sudo(uid).create({
                     'partner_id': partner.id,
                     'advocacy_source': 'Online Muskathlon registration',
-                    'engagement_ids': [(4, sporty.id)]
+                    'engagement_ids': [(4, sporty.id)],
+                    't_shirt_size': extra_values.get('t_shirt_size')
                 })
-                self._restore_fields(backup)
-            # This field is not needed in muskathlon registration.
-            values.pop('partner_name')
+                # self._restore_fields(backup)
+            # Convert the name for event registration
+            values['name'] = values.pop('partner_lastname', '')
+            values['name'] += ' ' + values.pop('partner_firstname')
             # Force default value instead of setting 0.
             values.pop('amount_objective')
             # Parse integer
             values['event_id'] = int(values['event_id'])
+            values['user_id'] = event.user_id.id
+            # Store invoice and event for after form creation
+            extra_values['invoice_id'] = invoice.id
+            self.event_id = event
 
         def _form_create(self, values):
             uid = self.env.ref('muskathlon.user_muskathlon_portal').id
-            self.main_object = self.form_model.sudo(uid).create(values.copy())
+            # If notification is sent in same job, the form is reloaded
+            # and all values are lost.
+            main_object = self.form_model.sudo(uid).with_context(
+                tracking_disable=True,
+                registration_force_draft=True).create(values.copy())
+            main_object.with_delay().notify_new_registration()
+            self.main_object = main_object
 
         def form_next_url(self, main_object=None):
             # Clean storage of picture
             self.request.session.pop('ambassador_picture_1', False)
-            if self.event_id.registration_fee:
+            if self.event_id.total_price:
                 return super(MuskathlonRegistrationForm, self).form_next_url(
                     main_object)
             else:
                 return '/muskathlon_registration/{}/success'.format(
                     self.main_object.id)
 
-        def _edit_transaction_values(self, tx_values):
+        def _edit_transaction_values(self, tx_values, form_vals):
             """ Add registration link and change reference. """
             tx_values.update({
                 'registration_id': self.main_object.id,
                 'reference': 'MUSK-REG-' + str(self.main_object.id),
-                'invoice_id': self.invoice_id.id
+                'invoice_id': form_vals['invoice_id']
             })
 
         def _backup_fields(self):

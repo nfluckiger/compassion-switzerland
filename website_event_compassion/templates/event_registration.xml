@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="event_registration_successful" name="Event registration success">
+        <t t-call="website.layout">
+            <t t-set="head">
+                <meta name="robots" content="noindex"/>
+            </t>
+            <div id="wrap">
+                <div class="container">
+                    <h3>We are glad to confirm your registration to
+                        <t t-esc="event.name"/>
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-3 mt16">
+                            <h4>Details</h4>
+                        </div>
+                        <div class="col-md-9 mt16">
+                            <h4>
+                                <a t-attf-href="{{'/event/' + slug(event.compassion_event_id)}}">
+                                    <t t-esc="event.name"/>
+                                </a>
+                            </h4>
+                            <i class="fa fa-clock-o"/>
+                            <span itemprop="startDate" t-esc="event.date_begin_located[:-3]"></span>
+                            <i>to</i>
+                            <span itemprop="endDate" t-esc="event.date_end_located[:-3]"></span>
+                            <div itemprop="location" class="mt16 mb8" t-field="event.address_id" t-options='{
+                            "widget": "contact",
+                            "fields": ["name", "address", "phone", "mobile", "fax", "email"]
+                            }'/>
+                        </div>
+                        <div class="col-md-3 mt16">
+                            <h4>Your registration</h4>
+                        </div>
+                        <div class="col-md-9 mt16">
+                            <table class='table table-bordered table-striped'>
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Name</th>
+                                        <th>E-mail</th>
+                                        <th>Phone</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="attendees" t-as="attendee">
+                                        <tr>
+                                            <td>
+                                                <t t-esc="attendee.id"/>
+                                            </td>
+                                            <td>
+                                                <i class="fa fa-user"></i>
+                                                <t t-if='attendee.name'>
+                                                    <t t-esc="attendee.name"/>
+                                                </t>
+                                                <t t-if='not attendee.name'>N/A</t>
+                                            </td>
+                                            <td>
+                                                <i class="fa fa-envelope"></i>
+                                                <t t-if='attendee.email'>
+                                                    <t t-esc="attendee.email"/>
+                                                </t>
+                                                <t t-if='not attendee.email'>N/A</t>
+                                            </td>
+                                            <td>
+                                                <i class="fa fa-phone"></i>
+                                                <t t-if='attendee.phone'>
+                                                    <t t-esc="attendee.phone"/>
+                                                </t>
+                                                <t t-if='not attendee.phone'>N/A</t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--Disallow confirmation page to be indexed.-->
+    <template id="robots_disallow" inherit_id="website_compassion.robots_disallow">
+        <xpath expr="." position="inside">
+            <t>
+Disallow: /event/*/registration/*
+            </t>
+        </xpath>
+    </template>
+</odoo>
